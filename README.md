@@ -29,13 +29,7 @@ Follow the below instructions with your normal user account (‼️ it will not 
 
 1. You are looking for the device name of your ethernet device. In the above example that's "Thunderbolt Ethernet Slot 0".
 
-1. Edit `wifi-toggle.sh` and change the ETHERNET_REGEX variable to match the name of your ethernet device. It doesn't have to be the full name of the device, but it **MUST** uniquely match only a single ethernet device. In this case either "Thunderbolt" or "Ethernet" would work fine. 
-
-```
-ETHERNET_REGEX="Ethernet"
-```
-
-If it matches more than one device, the script will error.
+1. Edit `wifi-toggle.sh` and change the ETHERNET_REGEX variable to match the name of your ethernet device. It doesn't have to be the full name of the device, but it **MUST** uniquely match only a single ethernet device. In this case either "Thunderbolt" or "Ethernet" would work fine. If it matches more than one device, the script will error.
 
 1. The script is setup to use the builtin Mac WiFi device called `Wi-Fi`. If you are using another device (eg. a USB WiFi adapter) you will also need to update the `WIFI_REGEX` variable.
 
@@ -44,7 +38,7 @@ If it matches more than one device, the script will error.
     - If your ethernet is active, your wifi will automatically turn off
     - If your ethernet is inactive, your wifi will automatically turn on.
 
-1. If you want to stop the automatic toggle, run `wifi-toggle.sh off`.  This is remove the launchd service.  You can enable it again anytime you like by running `wifi-toggle.sh on` again.
+1. If you want to stop the automatic toggle, remove the launchd service by running `wifi-toggle.sh off`.  You can enable it again anytime you like by running `wifi-toggle.sh on` again.
 
 ⚠️ ⚠️ ⚠️ If the script isn't working as expected, carefully read what it prints to the screen. It will usually show the error. 
 
@@ -91,5 +85,4 @@ DEBUG: enabling wifi
   
 - If you are somewhere without WiFi or ethernet and want to WiFi to stay disabled, you'll need to disable the script with `wifi-toggle.sh off`.
 
-- If you have more than on ethernet device, make sure that `ETHERNET_REGEX` you selected only matches the device you want to monitor. Currently the script doesn't support monitoring more than one ethernet device.
-
+- If you have more than one ethernet device, make sure that `ETHERNET_REGEX` only matches the device you want to monitor. Currently the script doesn't support monitoring more than one ethernet device.
