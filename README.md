@@ -56,7 +56,7 @@ Usage: wifi-toggle.sh [ on | off | help ]
 
 Run the toggle manually.  This is a good way to test that everything is working as expected before you enable the launchd service to autmatically toggle.
 
-If the script things your WiFi is correct, you'll see something like the below (pay attention to the last line).
+If the script things your WiFi is correct, you'll see something like the below:
 
 ```
 ❯ wifi-toggle.sh run
