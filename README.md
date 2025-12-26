@@ -2,13 +2,13 @@
 
 When my MacBook is connected to an ethernet connection, I'd like my WiFi to automatically turn off.  When I disconnect the ethernet, I'd like my WiFi to automatically turn back on. Sounds simple and obvious, but I couldn't find a tool to do this. I did find [this gist](https://gist.github.com/albertbori/1798d88a93175b9da00b#gistcomment-5913999) by Albert Bori.  In 2024 took Albert's basic idea and wrote `wifi-toggle.sh` from scratch to be as simple  to use as possible.
 
-There have been a couple requests to create a dedicated repo, which I've resisted because it seemed silly for such a simple script.  But there's been enough steady interest that maybe it's actually sensible.
+There have been a couple requests to create a dedicated repo, which I've resisted because it seemed silly for such a simple script.  But having a better place to collect issues and pull requests is possibly sensible, so we'll give this a try.
 
 ## Installation
 
-Run the script from your normal user account. It will not work as expected if you run it as `root`.
+Follow the below instructions with your normal user account (‼️ it will not if you run it as `root` ‼️).
 
-1. Download `wifi-toggle.sh` and move it to somewhere in your path (eg. `/usr/local/bin`).
+1. Download `wifi-toggle.sh` and move it to somewhere in your path (eg. `/usr/local/bin`)
    
 1. Give the script execute permissions: `chmod 755 wifi-toggle.sh`
 
@@ -26,7 +26,9 @@ Run the script from your normal user account. It will not work as expected if yo
 
 1. You are looking for the device name for your ethernet connection.  In the above example that's "Thunderbolt Ethernet Slot 0".
 
-1. Edit `wifi-toggle.sh` and change the ETHERNET_REGEX variable to match the name of your ethernet device. It doesn't have to be the full name but it **MUST** uniquely match only the name of your ethernet device. In this case either "Thunderbolt" or "Ethernet" would work fine. If it matches more than one line, the script will error.
+1. Edit `wifi-toggle.sh` and change the ETHERNET_REGEX variable to match the name of your ethernet device. It doesn't have to be the full name of the device, but it **MUST** uniquely match only a single ethernet device. In this case either "Thunderbolt" or "Ethernet" would work fine. If it matches more than one device, the script will error.
+
+1. The script is setup to use the builtin Mac WiFI device. If you aren't using something else (eg. a USB WiFi adapter) you will also need to update the `WIFI_REGEX` variable in the same way.
 
 1. Run `wifi-toggle.sh on` and it will install a launchd service in `~/Library/LaunchAgents`.  From now on ...
 
