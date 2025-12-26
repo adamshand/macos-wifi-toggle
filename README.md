@@ -3,9 +3,9 @@
 When my MacBook is connected to an ethernet connection, I'd like my WiFi to automatically turn off.  
 When I disconnect the ethernet, I'd like my WiFi to automatically turn back on. 
 
-Sounds simple and obvious, but I couldn't find a tool to do this. I did find [this gist](https://gist.github.com/albertbori/1798d88a93175b9da00b#gistcomment-5913999) by Albert Bori.  In 2024 I took Albert's basic idea and wrote `wifi-toggle.sh` from scratch to be as simple to use as possible.
+Sounds simple and obvious, but I couldn't find a tool to do this. I did find [this gist](https://gist.github.com/albertbori/1798d88a93175b9da00b#gistcomment-5913999) by Albert Bori. In 2024 I took Albert's basic idea and wrote `wifi-toggle.sh` from scratch to be as simple to use as possible.
 
-For the last couple years there's been a steady stream of comment on the gist and a couple of forks to add features. This repo is an attempt to provide a central place to document and improve the script.
+For the last couple years there's been a steady stream of comments on the gist and a couple of forks to add features. This repo is an attempt to provide a central place to document and improve the script.
 
 ## Installation
 
@@ -29,7 +29,13 @@ Follow the below instructions with your normal user account (‼️ it will not 
 
 1. You are looking for the device name of your ethernet device. In the above example that's "Thunderbolt Ethernet Slot 0".
 
-1. Edit `wifi-toggle.sh` and change the ETHERNET_REGEX variable to match the name of your ethernet device. It doesn't have to be the full name of the device, but it **MUST** uniquely match only a single ethernet device. In this case either "Thunderbolt" or "Ethernet" would work fine. If it matches more than one device, the script will error.
+1. Edit `wifi-toggle.sh` and change the ETHERNET_REGEX variable to match the name of your ethernet device. It doesn't have to be the full name of the device, but it **MUST** uniquely match only a single ethernet device. In this case either "Thunderbolt" or "Ethernet" would work fine. 
+
+```
+ETHERNET_REGEX="Ethernet"
+```
+
+If it matches more than one device, the script will error.
 
 1. The script is setup to use the builtin Mac WiFi device called `Wi-Fi`. If you are using another device (eg. a USB WiFi adapter) you will also need to update the `WIFI_REGEX` variable.
 
