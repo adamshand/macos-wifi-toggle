@@ -59,7 +59,7 @@ Run the toggle manually.  This is a good way to test that everything is working 
 If the script things your WiFi is correct, you'll see something like the below (pay attention to the last line).
 
 ```
-> ~/bin/darwin/wifi-toggle.sh run
+> wifi-toggle.sh run
 DEBUG: get_interface(): regex 'Ethernet' -> interface 'en3'
 DEBUG: get_interface(): regex '(Wi-Fi|Airport)' -> interface 'en0'
 DEBUG: ethernet status: 'inactive', wifi status: 'active'
@@ -69,7 +69,7 @@ DEBUG: not toggling wifi status
 If the script thinks you're WiFi status needs to be changed, you'll see something like this:
 
 ```
-> ~/bin/darwin/wifi-toggle.sh run
+> wifi-toggle.sh run
 DEBUG: get_interface(): regex 'Ethernet' -> interface 'en3'
 DEBUG: get_interface(): regex '(Wi-Fi|Airport)' -> interface 'en0'
 DEBUG: ethernet status: 'inactive', wifi status: 'inactive'
