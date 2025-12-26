@@ -35,8 +35,8 @@ Follow the below instructions with your normal user account (‼️ it will not 
 
 1. Run `wifi-toggle.sh on` and it will install a launchd service in `~/Library/LaunchAgents`.  From now on ...
 
-    - If your ethernet is active, your wifi will automatically turn off
-    - If your ethernet is inactive, your wifi will automatically turn on.
+    - If your ethernet is active, your WiFi will automatically turn off
+    - If your ethernet is inactive, your WiFI will automatically turn on.
 
 1. If you want to stop the automatic toggle, remove the launchd service by running `wifi-toggle.sh off`.  You can enable it again anytime you like by running `wifi-toggle.sh on` again.
 
