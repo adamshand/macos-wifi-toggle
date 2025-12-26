@@ -1,3 +1,5 @@
+<img height="192" alt="image" src="https://github.com/user-attachments/assets/0b28a118-ed81-43e1-8bfc-f0509b3a214b" />
+
 # Automatic WiFi Toggle for macOS
 
 When my MacBook is connected to an ethernet connection, I'd like my WiFi to automatically turn off.  
