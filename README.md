@@ -59,7 +59,7 @@ Run the toggle manually.  This is a good way to test that everything is working 
 If the script things your WiFi is correct, you'll see something like the below (pay attention to the last line).
 
 ```
-> wifi-toggle.sh run
+❯ wifi-toggle.sh run
 DEBUG: get_interface(): regex 'Ethernet' -> interface 'en3'
 DEBUG: get_interface(): regex '(Wi-Fi|Airport)' -> interface 'en0'
 DEBUG: ethernet status: 'inactive', wifi status: 'active'
@@ -69,7 +69,7 @@ DEBUG: not toggling wifi status
 If the script thinks you're WiFi status needs to be changed, you'll see something like this:
 
 ```
-> wifi-toggle.sh run
+❯ wifi-toggle.sh run
 DEBUG: get_interface(): regex 'Ethernet' -> interface 'en3'
 DEBUG: get_interface(): regex '(Wi-Fi|Airport)' -> interface 'en0'
 DEBUG: ethernet status: 'inactive', wifi status: 'inactive'
@@ -80,9 +80,9 @@ DEBUG: enabling wifi
 
 - The script requires write permssion to `~/Library/LaunchAgents`.  If you get the below error message, you need to change the permissions so your user account can write a file into `~/Library/LaunchAgents`.
 
-   ```
-  /wifi-toggle.sh: line 53: ~/Library/LaunchAgents/nz.haume.wifi-toggle.plist: Permission denied
-  ```
+    ```
+    /wifi-toggle.sh: line 53: ~/Library/LaunchAgents/nz.haume.wifi-toggle.plist: Permission denied
+    ```
   
 - If you are somewhere without WiFi or ethernet and want to WiFi to stay disabled, you'll need to disable the script with `wifi-toggle.sh off`.
 
