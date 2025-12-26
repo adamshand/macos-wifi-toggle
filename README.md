@@ -78,9 +78,10 @@ DEBUG: enabling wifi
 
 ## Troubleshooting
 
-- Sometimes write permssion to `~/Library/LaunchAgents` is restricted (I don't know why). If so you will see an error when the script runs that looks something like:
+- The script requires write permssion to `~/Library/LaunchAgents`.  If you get the below error message, you need to change the permissions so your user account can write a file into `~/Library/LaunchAgents`.
+
    ```
-  /wifi-toggle.sh: line 53: /Users/adam/Library/LaunchAgents/nz.haume.wifi-toggle.plist: Permission denied
+  /wifi-toggle.sh: line 53: ~/Library/LaunchAgents/nz.haume.wifi-toggle.plist: Permission denied
   ```
   
 - If you are somewhere without WiFi or ethernet and want to WiFi to stay disabled, you'll need to disable the script with `wifi-toggle.sh off`.
