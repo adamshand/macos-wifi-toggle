@@ -51,7 +51,7 @@ Automatically toggle macOS Wi-Fi based on ethernet status (uses launchd)
 Usage: wifi-toggle.sh [ on | off | help ]
    on - start automatically toggling Wi-Fi (install launchd service)
   off - stop automatically toggling Wi-Fi (uninstall launchd service)
-  run - Toggle Wi-Fi status (run by launchd)
+  run - Toggle Wi-Fi status
 ```
 
 Run the toggle manually.  This is a good way to test that everything is working as expected before you enable the launchd service to autmatically toggle.
