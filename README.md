@@ -1,6 +1,7 @@
 # Automatic WiFi Toggle for macOS
 
-When my MacBook is connected to an ethernet connection, I'd like my WiFi to automatically turn off.  When I disconnect the ethernet, I'd like my WiFi to automatically turn back on. 
+When my MacBook is connected to an ethernet connection, I'd like my WiFi to automatically turn off.  
+When I disconnect the ethernet, I'd like my WiFi to automatically turn back on. 
 
 Sounds simple and obvious, but I couldn't find a tool to do this. I did find [this gist](https://gist.github.com/albertbori/1798d88a93175b9da00b#gistcomment-5913999) by Albert Bori.  In 2024 I took Albert's basic idea and wrote `wifi-toggle.sh` from scratch to be as simple to use as possible.
 
