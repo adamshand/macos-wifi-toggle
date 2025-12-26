@@ -4,6 +4,8 @@ When my MacBook is connected to an ethernet connection, I'd like my WiFi to auto
 
 Sounds simple and obvious, but I couldn't find a tool to do this. I did find [this gist](https://gist.github.com/albertbori/1798d88a93175b9da00b#gistcomment-5913999) by Albert Bori.  In 2024 I took Albert's basic idea and wrote `wifi-toggle.sh` from scratch to be as simple to use as possible.
 
+For the last couple years there's been a steady stream of comment on the gist and a couple of forks to add features. This repo is an attempt to provide a central place to document and improve the script.
+
 ## Installation
 
 Follow the below instructions with your normal user account (‼️ it will not work if you run it as `root` ‼️).
