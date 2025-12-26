@@ -66,7 +66,7 @@ DEBUG: ethernet status: 'inactive', wifi status: 'active'
 DEBUG: not toggling wifi status
 ```
 
-If the script thinks you're WiFi status needs to be changed, you'll see something like this:
+If the script thinks your WiFi status needs to be changed, you'll see something like this:
 
 ```
 ❯ wifi-toggle.sh run
