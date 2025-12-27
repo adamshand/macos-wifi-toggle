@@ -1,6 +1,5 @@
-<img height="192" alt="image" src="https://github.com/user-attachments/assets/0b28a118-ed81-43e1-8bfc-f0509b3a214b" />
 
-# Automatic WiFi Toggle for macOS
+# <img height="28" alt="toggle switch" src="https://github.com/user-attachments/assets/54f8838f-8b61-4931-a7f3-793973ad1eaa" />  Automatic WiFi Toggle for macOS 
 
 When my MacBook is connected to an ethernet connection, I'd like my WiFi to automatically turn off.  
 When I disconnect the ethernet, I'd like my WiFi to automatically turn back on. 
