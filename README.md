@@ -57,7 +57,7 @@ Usage: wifi-toggle.sh [ on | off | help ]
 
 Run the toggle manually.  This is a good way to test that everything is working as expected before you enable the launchd service to autmatically toggle.
 
-If the script things your WiFi is correct, you'll see something like the below:
+If the script thinks everything is correct, you'll see something like the below:
 
 ```
 ❯ wifi-toggle.sh run
@@ -67,7 +67,7 @@ DEBUG: ethernet status: 'inactive', wifi status: 'active'
 DEBUG: not toggling wifi status
 ```
 
-If the script thinks your WiFi status needs to be changed, you'll see something like this:
+If the script thinks your WiFi needs to be turned on (or off), you'll see something like this:
 
 ```
 ❯ wifi-toggle.sh run
