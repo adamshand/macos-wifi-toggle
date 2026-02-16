@@ -137,6 +137,14 @@ if [ "$1" == "run" ]; then
   toggle_wifi
 
 elif [ "$1" == "on" ]; then
+  LAUNCHDIR="${HOME}/Library/LaunchAgents"
+  if [ -d "${LAUNCHDIR}" ]; then
+    print_debug "${LAUNCHDIR} exists"
+  else
+    print_debug "${LAUNCHDIR} does not exist"
+    mkdir "${HOME}/Library/LaunchAgents" && echo "Created directory ${HOME}/Library/LaunchAgents"
+  fi
+  
   if is_launchd_enabled; then
     print_error "launchd service already enabled"
   else
