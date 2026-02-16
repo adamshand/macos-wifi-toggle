@@ -32,7 +32,7 @@ Follow the below instructions with your normal user account (‼️ it will not 
 
 1. Edit `wifi-toggle.sh` and change the ETHERNET_REGEX variable to match the name of your ethernet device. It doesn't have to be the full name of the device, but it **MUST** uniquely match only a single ethernet device. In this case either "Thunderbolt" or "Ethernet" would work fine. If it matches more than one device, the script will error.
 
-1. The script is setup to use the builtin Mac WiFi device called `Wi-Fi`. If you are using another device (eg. a USB WiFi adapter) you will also need to update the `WIFI_REGEX` variable.
+1. By default the script uses the builtin Mac WiFi device `Wi-Fi`. If you are using another device (eg. a USB WiFi adapter) you will also need to update the `WIFI_REGEX` variable.
 
 1. Run `wifi-toggle.sh on` and it will install a launchd service in `~/Library/LaunchAgents`.  From now on ...
 
