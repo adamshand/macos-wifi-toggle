@@ -1,6 +1,8 @@
 
 # <img height="28" alt="toggle switch" src="https://github.com/user-attachments/assets/54f8838f-8b61-4931-a7f3-793973ad1eaa" />  Automatic WiFi Toggle for macOS 
 
+⚠️ If you would like this added to Homebrew, click the star. Homebrew won't accept until a [repo has 75 stars](https://docs.brew.sh/Acceptable-Casks#rejected-casks).
+
 - When I connect my MacBook to an ethernet network, I'd like my WiFi to automatically turn off.  
 - When I disconnect my MacBook from an ethernet network, I'd like my WiFi to automatically turn on. 
 
