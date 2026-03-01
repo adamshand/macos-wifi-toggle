@@ -8,7 +8,8 @@ LAUNCHD_SERVICE_NAME="nz.haume.wifi-toggle"
 LAUNCHD_SERVICE_FILE="${HOME}/Library/LaunchAgents/${LAUNCHD_SERVICE_NAME}.plist"
 DEBUG="yes"
 
-# Each regex must match a single interface from `networksetup -listnetworkserviceorder`
+# Each regex matches one or more interfaces from `networksetup -listnetworkserviceorder`
+# Wi-Fi is disabled if ANY matching ethernet interface is active
 # eg. "(2) CalDigit TS3" or "(1) Apple USB Ethernet Adapter"
 ETHERNET_REGEX="CalDigit TS3"
 # ETHERNET_REGEX="Apple USB Ethernet Adapter"
@@ -87,20 +88,40 @@ get_interface() {
 
   if [ -z "$INTERFACE" ]; then
     print_error "No ethernet interface matches: $1"
-  elif [[ "$INTERFACE" == *$'\n'* ]]; then
-    print_error "Multiple ethernet interfaces match: $1"
   fi
 
-  print_debug "get_interface(): regex '$1' -> interface '$INTERFACE'"
+  print_debug "get_interface(): regex '$1' -> interface(s) '$INTERFACE'"
   echo "$INTERFACE"
 }
 
 is_interface_active() {
   test -z "$1" && print_error "is_interface_active(): no interface provided"
 
-  if ifconfig "$1" 2>&1 | grep -q "status: active"; then
-    echo -n "active"
-    return 0
+  # Check if interface exists and has status: active
+  if ! ifconfig "$1" > /dev/null 2>&1; then
+    echo -n "inactive"
+    return 1
+  fi
+  
+  # For Ethernet: check both status and if it has an IP address
+  # For Wi-Fi: just check status
+  local STATUS=$(ifconfig "$1" 2>&1 | grep "status:" | awk '{print $2}')
+  
+  if [ "$STATUS" == "active" ]; then
+    # If checking ethernet, also verify it has an actual connection (IP address)
+    if echo "$1" | grep -q "^en[0-9]" && ! echo "$1" | grep -q "^en0$"; then
+      # For ethernet interfaces (excluding en0 which is usually Wi-Fi)
+      if ifconfig "$1" | grep -q "inet "; then
+        echo -n "active"
+        return 0
+      else
+        echo -n "inactive"
+        return 1
+      fi
+    else
+      echo -n "active"
+      return 0
+    fi
   else
     echo -n "inactive"
     return 1
@@ -108,10 +129,20 @@ is_interface_active() {
 }
 
 toggle_wifi() {
-  ETHERNET_INTERFACE=$(get_interface "$ETHERNET_REGEX")
+  ETHERNET_INTERFACES=$(get_interface "$ETHERNET_REGEX")
   WIFI_INTERFACE=$(get_interface "$WIFI_REGEX")
 
-  ETHERNET_STATUS=$(is_interface_active "$ETHERNET_INTERFACE")
+  # Check if any ethernet interface is active
+  ETHERNET_STATUS="inactive"
+  for ETH_IF in $ETHERNET_INTERFACES; do
+    STATUS=$(is_interface_active "$ETH_IF")
+    print_debug "ethernet interface '$ETH_IF' status: '$STATUS'"
+    if [ "$STATUS" == "active" ]; then
+      ETHERNET_STATUS="active"
+      break
+    fi
+  done
+
   WIFI_STATUS=$(is_interface_active "$WIFI_INTERFACE")
   print_debug "ethernet status: '$ETHERNET_STATUS', wifi status: '$WIFI_STATUS'"
 

@@ -32,7 +32,7 @@ Follow the below instructions with your normal user account (‼️ it will not 
 
 1. You are looking for the device name of your ethernet device. In the above example that's "Thunderbolt Ethernet Slot 0".
 
-1. Edit `wifi-toggle.sh` and change the ETHERNET_REGEX variable to match the name of your ethernet device. It doesn't have to be the full name of the device, but it **MUST** uniquely match only a single ethernet device. In this case either "Thunderbolt" or "Ethernet" would work fine. If it matches more than one device, the script will error.
+1. Edit `wifi-toggle.sh` and change the ETHERNET_REGEX variable to match the name of your ethernet device(s). It doesn't have to be the full name of the device. In this case either "Thunderbolt" or "Ethernet" would work fine. If the regex matches multiple ethernet devices, WiFi will be disabled when ANY of them are active.
 
 1. By default the script uses the builtin Mac WiFi device `Wi-Fi`. If you are using another device (eg. a USB WiFi adapter) you will also need to update the `WIFI_REGEX` variable.
 
@@ -63,8 +63,9 @@ If the script thinks everything is correct, you'll see something like the below:
 
 ```
 ❯ wifi-toggle.sh run
-DEBUG: get_interface(): regex 'Ethernet' -> interface 'en3'
-DEBUG: get_interface(): regex '(Wi-Fi|Airport)' -> interface 'en0'
+DEBUG: get_interface(): regex 'Ethernet' -> interface(s) 'en3'
+DEBUG: get_interface(): regex '(Wi-Fi|Airport)' -> interface(s) 'en0'
+DEBUG: ethernet interface 'en3' status: 'inactive'
 DEBUG: ethernet status: 'inactive', wifi status: 'active'
 DEBUG: not toggling wifi status
 ```
@@ -73,8 +74,9 @@ If the script thinks your WiFi needs to be turned on (or off), you'll see someth
 
 ```
 ❯ wifi-toggle.sh run
-DEBUG: get_interface(): regex 'Ethernet' -> interface 'en3'
-DEBUG: get_interface(): regex '(Wi-Fi|Airport)' -> interface 'en0'
+DEBUG: get_interface(): regex 'Ethernet' -> interface(s) 'en3'
+DEBUG: get_interface(): regex '(Wi-Fi|Airport)' -> interface(s) 'en0'
+DEBUG: ethernet interface 'en3' status: 'inactive'
 DEBUG: ethernet status: 'inactive', wifi status: 'inactive'
 DEBUG: enabling wifi
 ```
@@ -89,4 +91,4 @@ DEBUG: enabling wifi
   
 - If you are somewhere without WiFi or ethernet and want to WiFi to stay disabled, you'll need to disable the script with `wifi-toggle.sh off`.
 
-- If you have more than one ethernet device, make sure that `ETHERNET_REGEX` only matches the device you want to monitor. Currently the script doesn't support monitoring more than one ethernet device.
+- The script supports monitoring multiple ethernet devices. If `ETHERNET_REGEX` matches multiple devices, WiFi will be disabled when ANY of them have an active connection (verified by checking for an IP address).
