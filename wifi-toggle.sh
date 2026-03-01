@@ -94,8 +94,11 @@ get_interface() {
   echo "$INTERFACE"
 }
 
+# Parameters: $1=interface name, $2=is_wifi (true for Wi-Fi, false for ethernet)
+# Returns: "active" or "inactive", exit code 0 for active, 1 for inactive
 is_interface_active() {
   test -z "$1" && print_error "is_interface_active(): no interface provided"
+  local IS_WIFI="${2:-false}"  # Second parameter: true for Wi-Fi, false/omitted for other interfaces
 
   # Check if interface exists and has status: active
   if ! ifconfig "$1" > /dev/null 2>&1; then
@@ -103,14 +106,15 @@ is_interface_active() {
     return 1
   fi
   
-  # For Ethernet: check both status and if it has an IP address
-  # For Wi-Fi: just check status
   local STATUS=$(ifconfig "$1" 2>&1 | grep "status:" | awk '{print $2}')
   
   if [ "$STATUS" == "active" ]; then
-    # If checking ethernet, also verify it has an actual connection (IP address)
-    if echo "$1" | grep -q "^en[0-9]" && ! echo "$1" | grep -q "^en0$"; then
-      # For ethernet interfaces (excluding en0 which is usually Wi-Fi)
+    # For Wi-Fi interfaces: just check status
+    if [ "$IS_WIFI" == "true" ]; then
+      echo -n "active"
+      return 0
+    else
+      # For Ethernet interfaces: verify it has an actual connection (IP address)
       if ifconfig "$1" | grep -q "inet "; then
         echo -n "active"
         return 0
@@ -118,9 +122,6 @@ is_interface_active() {
         echo -n "inactive"
         return 1
       fi
-    else
-      echo -n "active"
-      return 0
     fi
   else
     echo -n "inactive"
@@ -135,7 +136,7 @@ toggle_wifi() {
   # Check if any ethernet interface is active
   ETHERNET_STATUS="inactive"
   for ETH_IF in $ETHERNET_INTERFACES; do
-    STATUS=$(is_interface_active "$ETH_IF")
+    STATUS=$(is_interface_active "$ETH_IF" false)
     print_debug "ethernet interface '$ETH_IF' status: '$STATUS'"
     if [ "$STATUS" == "active" ]; then
       ETHERNET_STATUS="active"
@@ -143,7 +144,7 @@ toggle_wifi() {
     fi
   done
 
-  WIFI_STATUS=$(is_interface_active "$WIFI_INTERFACE")
+  WIFI_STATUS=$(is_interface_active "$WIFI_INTERFACE" true)
   print_debug "ethernet status: '$ETHERNET_STATUS', wifi status: '$WIFI_STATUS'"
 
   if [ "$ETHERNET_STATUS" == "active" ] && [ "$WIFI_STATUS" == "active" ]; then
