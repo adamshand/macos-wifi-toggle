@@ -6,19 +6,20 @@
 PATH="/bin:/sbin:/usr/bin:/usr/sbin"
 LAUNCHD_SERVICE_NAME="nz.haume.wifi-toggle"
 LAUNCHD_SERVICE_FILE="${HOME}/Library/LaunchAgents/${LAUNCHD_SERVICE_NAME}.plist"
-DEBUG="yes"
+DEBUG=""  # Set to "yes" to enable debug output
 
 # Each regex matches one or more interfaces from `networksetup -listnetworkserviceorder`
-# Wi-Fi is disabled if ANY matching ethernet interface is active
-# eg. "(2) CalDigit TS3" or "(1) Apple USB Ethernet Adapter"
-ETHERNET_REGEX="CalDigit TS3"
-# ETHERNET_REGEX="Apple USB Ethernet Adapter"
-# ETHERNET_REGEX="Ethernet"
+# Wi-Fi is disabled if ANY matching ethernet interface is active.
+# NOTE: Customize this regex to match your ethernet adapter(s). Common values:
+#   "Thunderbolt Ethernet"       - Thunderbolt-to-Ethernet adapters
+#   "Apple USB Ethernet Adapter" - Apple USB ethernet
+#   "Ethernet"                   - matches any interface containing "Ethernet"
+ETHERNET_REGEX="Thunderbolt Ethernet|LAN"
 WIFI_REGEX="(Wi-Fi|Airport)"
 
 print_usage() {
   echo -e "Automatically toggle macOS Wi-Fi based on ethernet status (uses launchd)\n"
-  echo "Usage: $(basename $0) [ on | off | help ]"
+  echo "Usage: $(basename "$0") [ on | off | help ]"
   echo "   on - start automatically toggling Wi-Fi (install launchd service)"
   echo "  off - stop automatically toggling Wi-Fi (uninstall launchd service)"
   echo "  run - Toggle Wi-Fi status (run by launchd)"
@@ -36,7 +37,7 @@ print_debug() {
 
 notify() {
   # Configure notifications in: System Settings > Notifications > Script Editor
-  osascript -e "display notification \"by $(basename $0)\" with title \"$1\""
+  osascript -e "display notification \"by $(basename "$0")\" with title \"$1\""
 }
 
 is_launchd_enabled() {
@@ -50,6 +51,9 @@ is_launchd_enabled() {
 }
 
 enable_launchd() {
+  local SCRIPT_PATH
+  SCRIPT_PATH=$(realpath "$0") || print_error "Could not resolve script path"
+
   echo "Creating launchd service: $LAUNCHD_SERVICE_FILE"
   cat <<EOF > "$LAUNCHD_SERVICE_FILE"
 <?xml version="1.0" encoding="UTF-8"?>
@@ -62,7 +66,7 @@ enable_launchd() {
   <true/>
   <key>ProgramArguments</key>
   <array>
-  <string>$(realpath "$0")</string>
+  <string>${SCRIPT_PATH}</string>
   <string>run</string>
   </array>
   <key>WatchPaths</key>
@@ -78,80 +82,84 @@ EOF
 
 disable_launchd() {
   echo "Disabling launchd service: $LAUNCHD_SERVICE_NAME"
-  launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/nz.haume.wifi-toggle.plist
+  launchctl bootout gui/$(id -u) "$LAUNCHD_SERVICE_FILE"
   rm "$LAUNCHD_SERVICE_FILE"
 }
 
+# Returns a newline-separated list of interface names matching the given regex,
+# or empty string if none found (does not exit on no match).
 get_interface() {
   test -z "$1" && print_error "get_interface(): no regex provided"
+  local INTERFACE
   INTERFACE=$(networksetup -listnetworkserviceorder | grep -E -A 1 "^\([0-9]+\).* $1" | grep -E -o "en[0-9]+")
-
-  if [ -z "$INTERFACE" ]; then
-    print_error "No ethernet interface matches: $1"
-  fi
-
-  print_debug "get_interface(): regex '$1' -> interface(s) '$INTERFACE'"
+  print_debug "get_interface(): regex '$1' -> interface(s) '$(echo "$INTERFACE" | tr '\n' ' ')'"
   echo "$INTERFACE"
 }
 
-# Parameters: $1=interface name, $2=is_wifi (true for Wi-Fi, false for ethernet)
-# Returns: "active" or "inactive", exit code 0 for active, 1 for inactive
+# Parameters: $1=interface name, $2=is_wifi ("true" for Wi-Fi, omit for ethernet)
+# Outputs: "active" or "inactive" to stdout
 is_interface_active() {
   test -z "$1" && print_error "is_interface_active(): no interface provided"
-  local IS_WIFI="${2:-false}"  # Second parameter: true for Wi-Fi, false/omitted for other interfaces
+  local IS_WIFI="${2:-false}"
 
-  # Check if interface exists and has status: active
   if ! ifconfig "$1" > /dev/null 2>&1; then
-    echo -n "inactive"
-    return 1
+    echo "inactive"
+    return
   fi
-  
-  local STATUS=$(ifconfig "$1" 2>&1 | grep "status:" | awk '{print $2}')
-  
-  if [ "$STATUS" == "active" ]; then
-    # For Wi-Fi interfaces: just check status
-    if [ "$IS_WIFI" == "true" ]; then
-      echo -n "active"
-      return 0
+
+  local STATUS
+  STATUS=$(ifconfig "$1" 2>&1 | grep "status:" | awk '{print $2}')
+
+  if [ "$STATUS" = "active" ]; then
+    if [ "$IS_WIFI" = "true" ]; then
+      echo "active"
     else
-      # For Ethernet interfaces: verify it has an actual connection (IP address)
+      # For ethernet: also require an IP address to confirm a real connection
       if ifconfig "$1" | grep -q "inet "; then
-        echo -n "active"
-        return 0
+        echo "active"
       else
-        echo -n "inactive"
-        return 1
+        echo "inactive"
       fi
     fi
   else
-    echo -n "inactive"
-    return 1
+    echo "inactive"
   fi
 }
 
 toggle_wifi() {
+  local ETHERNET_INTERFACES WIFI_INTERFACE
   ETHERNET_INTERFACES=$(get_interface "$ETHERNET_REGEX")
-  WIFI_INTERFACE=$(get_interface "$WIFI_REGEX")
+  WIFI_INTERFACE=$(get_interface "$WIFI_REGEX" | head -n1)
 
-  # Check if any ethernet interface is active
-  ETHERNET_STATUS="inactive"
-  for ETH_IF in $ETHERNET_INTERFACES; do
-    STATUS=$(is_interface_active "$ETH_IF" false)
-    print_debug "ethernet interface '$ETH_IF' status: '$STATUS'"
-    if [ "$STATUS" == "active" ]; then
-      ETHERNET_STATUS="active"
-      break
-    fi
-  done
+  if [ -z "$WIFI_INTERFACE" ]; then
+    print_error "No Wi-Fi interface found matching: $WIFI_REGEX"
+  fi
 
+  # Check if any ethernet interface is active; treat no interfaces found as inactive
+  local ETHERNET_STATUS="inactive"
+  if [ -n "$ETHERNET_INTERFACES" ]; then
+    for ETH_IF in $ETHERNET_INTERFACES; do
+      local STATUS
+      STATUS=$(is_interface_active "$ETH_IF" false)
+      print_debug "ethernet interface '$ETH_IF' status: '$STATUS'"
+      if [ "$STATUS" = "active" ]; then
+        ETHERNET_STATUS="active"
+        break
+      fi
+    done
+  else
+    print_debug "no ethernet interfaces found matching: $ETHERNET_REGEX"
+  fi
+
+  local WIFI_STATUS
   WIFI_STATUS=$(is_interface_active "$WIFI_INTERFACE" true)
   print_debug "ethernet status: '$ETHERNET_STATUS', wifi status: '$WIFI_STATUS'"
 
-  if [ "$ETHERNET_STATUS" == "active" ] && [ "$WIFI_STATUS" == "active" ]; then
+  if [ "$ETHERNET_STATUS" = "active" ] && [ "$WIFI_STATUS" = "active" ]; then
     print_debug "disabling wifi"
     networksetup -setairportpower "$WIFI_INTERFACE" off
     notify "Wi-Fi Disabled"
-  elif [ "$ETHERNET_STATUS" == "inactive" ] && [ "$WIFI_STATUS" == "inactive" ]; then
+  elif [ "$ETHERNET_STATUS" = "inactive" ] && [ "$WIFI_STATUS" = "inactive" ]; then
     print_debug "enabling wifi"
     networksetup -setairportpower "$WIFI_INTERFACE" on
     notify "Wi-Fi Enabled"
@@ -165,25 +173,18 @@ if [ "${OSTYPE:0:6}" != "darwin" ]; then
   print_error "This script only runs on macOS"
 fi
 
-if [ "$1" == "run" ]; then
+if [ "$1" = "run" ]; then
   toggle_wifi
 
-elif [ "$1" == "on" ]; then
-  LAUNCHDIR="${HOME}/Library/LaunchAgents"
-  if [ -d "${LAUNCHDIR}" ]; then
-    print_debug "${LAUNCHDIR} exists"
-  else
-    print_debug "${LAUNCHDIR} does not exist"
-    mkdir "${HOME}/Library/LaunchAgents" && echo "Created directory ${HOME}/Library/LaunchAgents"
-  fi
-  
+elif [ "$1" = "on" ]; then
   if is_launchd_enabled; then
     print_error "launchd service already enabled"
   else
+    mkdir -p "${HOME}/Library/LaunchAgents"
     enable_launchd
   fi
 
-elif [ "$1" == "off" ]; then
+elif [ "$1" = "off" ]; then
   if is_launchd_enabled; then
     disable_launchd
   else
