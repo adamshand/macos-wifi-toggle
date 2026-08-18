@@ -69,6 +69,11 @@ Follow these instructions with your normal user account. The script will show an
 
 Running `wifi-toggle.sh on` again safely updates the launchd service. Do this after moving the script to a different location.
 
+## Upgrading
+
+- Copy the new version of `wifi-toggle.sh` over the top of the old one (launchd will use the upgraded script the next time it runs).
+- Run `wifi-toggle.sh on` to validate the installed service.
+
 ## Usage
 
 ```text
@@ -89,6 +94,7 @@ The `status` command shows whether automatic toggling is enabled, every detected
 ❯ wifi-toggle.sh status
 Automatic toggle: enabled
 Installed script: /Users/adam/bin/wifi-toggle.sh
+Installed service version: 2
 Wi-Fi interfaces:
   en0: on
 Wired interfaces:

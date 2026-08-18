@@ -9,9 +9,11 @@
 
 PATH="/bin:/sbin:/usr/bin:/usr/sbin"
 LAUNCHD_SERVICE_NAME="nz.haume.wifi-toggle"
+LAUNCHD_SERVICE_VERSION="2"
 LAUNCHD_SERVICE_FILE="${HOME}/Library/LaunchAgents/${LAUNCHD_SERVICE_NAME}.plist"
 STATE_DIRECTORY="${HOME}/Library/Application Support/${LAUNCHD_SERVICE_NAME}"
 WIFI_DISABLED_FILE="${STATE_DIRECTORY}/wifi-disabled"
+LEGACY_MIGRATION_FILE="${STATE_DIRECTORY}/legacy-migration-complete"
 DEBUG="yes"
 
 # Keep the launchd file and state file private to the current user.
@@ -87,6 +89,11 @@ create_launchd_service() {
   <string>${LAUNCHD_SERVICE_NAME}</string>
   <key>RunAtLoad</key>
   <true/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>WIFI_TOGGLE_SERVICE_VERSION</key>
+    <string>${LAUNCHD_SERVICE_VERSION}</string>
+  </dict>
   <key>ProgramArguments</key>
   <array>
     <string>${ESCAPED_SCRIPT_FILE}</string>
@@ -112,6 +119,8 @@ EOF
 }
 
 enable_launchd() {
+  migrate_legacy_wifi_state
+
   LAUNCHD_WAS_ENABLED="no"
   if is_launchd_enabled; then
     LAUNCHD_WAS_ENABLED="yes"
@@ -126,6 +135,9 @@ enable_launchd() {
 
   echo "Enabling launchd service: $LAUNCHD_SERVICE_NAME"
   launchctl bootstrap "gui/$(id -u)" "$LAUNCHD_SERVICE_FILE" || print_error "Unable to enable launchd service"
+
+  rm -f "$LEGACY_MIGRATION_FILE"
+  rmdir "$STATE_DIRECTORY" >/dev/null 2>&1 || true
 }
 
 disable_launchd() {
@@ -194,6 +206,49 @@ remember_wifi_disabled() {
   touch "$WIFI_DISABLED_FILE" || print_error "Unable to save Wi-Fi state"
 }
 
+is_legacy_launchd_service() {
+  if [ -e "$LAUNCHD_SERVICE_FILE" ]; then
+    INSTALLED_SERVICE_VERSION=$(plutil -extract EnvironmentVariables.WIFI_TOGGLE_SERVICE_VERSION raw "$LAUNCHD_SERVICE_FILE" 2>/dev/null) || return 0
+    test "$INSTALLED_SERVICE_VERSION" != "$LAUNCHD_SERVICE_VERSION" && return 0
+    return 1
+  fi
+
+  # A loaded service without its plist is also from an older installation.
+  is_launchd_enabled
+}
+
+migrate_legacy_wifi_state() {
+  test -e "$LEGACY_MIGRATION_FILE" && return 0
+  is_legacy_launchd_service || return 0
+
+  LEGACY_WIFI_WAS_OFF="no"
+  for WIFI_INTERFACE in $WIFI_INTERFACES; do
+    get_wifi_power "$WIFI_INTERFACE"
+    if [ "$WIFI_POWER" == "off" ]; then
+      LEGACY_WIFI_WAS_OFF="yes"
+    fi
+  done
+
+  if [ "$LEGACY_WIFI_WAS_OFF" == "yes" ]; then
+    print_debug "legacy launchd service found with Wi-Fi off; saving Wi-Fi state"
+    remember_wifi_disabled
+  else
+    mkdir -p "$STATE_DIRECTORY" || print_error "Unable to create state directory: $STATE_DIRECTORY"
+  fi
+
+  touch "$LEGACY_MIGRATION_FILE" || print_error "Unable to save legacy migration state"
+}
+
+prepare_wifi_toggle() {
+  discover_interfaces
+
+  # Current launchd services provide their version in the environment. An old
+  # service enters this migration once, then leaves a marker until it is updated.
+  if [ "${WIFI_TOGGLE_SERVICE_VERSION:-}" != "$LAUNCHD_SERVICE_VERSION" ] && [ ! -e "$LEGACY_MIGRATION_FILE" ]; then
+    migrate_legacy_wifi_state
+  fi
+}
+
 restore_wifi() {
   test ! -e "$WIFI_DISABLED_FILE" && return 0
 
@@ -216,8 +271,6 @@ restore_wifi() {
 }
 
 toggle_wifi() {
-  discover_interfaces
-
   WIRED_ACTIVE="no"
   for WIRED_INTERFACE in $WIRED_INTERFACES; do
     if is_interface_active "$WIRED_INTERFACE"; then
@@ -264,7 +317,9 @@ print_status() {
 
   if [ -e "$LAUNCHD_SERVICE_FILE" ]; then
     INSTALLED_SCRIPT=$(plutil -extract ProgramArguments.0 raw "$LAUNCHD_SERVICE_FILE" 2>/dev/null) || INSTALLED_SCRIPT="unknown"
+    INSTALLED_SERVICE_VERSION=$(plutil -extract EnvironmentVariables.WIFI_TOGGLE_SERVICE_VERSION raw "$LAUNCHD_SERVICE_FILE" 2>/dev/null) || INSTALLED_SERVICE_VERSION="legacy"
     echo "Installed script: $INSTALLED_SCRIPT"
+    echo "Installed service version: $INSTALLED_SERVICE_VERSION"
 
     get_script_file
     if [ "$INSTALLED_SCRIPT" != "unknown" ] && [ "$INSTALLED_SCRIPT" != "$SCRIPT_FILE" ]; then
@@ -316,6 +371,7 @@ elif [ "$(id -u)" == "0" ]; then
 fi
 
 if [ "$COMMAND" == "run" ]; then
+  prepare_wifi_toggle
   toggle_wifi
 
 elif [ "$COMMAND" == "on" ]; then
@@ -339,6 +395,9 @@ elif [ "$COMMAND" == "off" ]; then
     echo "Restoring Wi-Fi disabled by this script"
     restore_wifi
   fi
+
+  rm -f "$LEGACY_MIGRATION_FILE"
+  rmdir "$STATE_DIRECTORY" >/dev/null 2>&1 || true
 
 elif [ "$COMMAND" == "status" ]; then
   print_status
