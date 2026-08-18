@@ -1,92 +1,137 @@
+# <img height="28" alt="toggle switch" src="https://github.com/user-attachments/assets/54f8838f-8b61-4931-a7f3-793973ad1eaa" /> Automatic Wi-Fi Toggle for macOS
 
-# <img height="28" alt="toggle switch" src="https://github.com/user-attachments/assets/54f8838f-8b61-4931-a7f3-793973ad1eaa" />  Automatic WiFi Toggle for macOS 
+⚠️ If you would like this added to Homebrew, click the star. Homebrew's [package acceptance policy](https://docs.brew.sh/Package-Acceptance-Policy#notability) normally requires 75 stars for a third-party submission or 225 stars for an owner self-submission. Fork and watcher thresholds can also qualify.
 
-⚠️ If you would like this added to Homebrew, click the star. Homebrew won't accept until a [repo has 75 stars](https://docs.brew.sh/Acceptable-Casks#rejected-casks).
-
-- When I connect my MacBook to an ethernet network, I'd like my WiFi to automatically turn off.  
-- When I disconnect my MacBook from an ethernet network, I'd like my WiFi to automatically turn on. 
+- When I connect my MacBook to a wired network, I'd like Wi-Fi to automatically turn off.
+- When I disconnect my MacBook from all wired networks, I'd like Wi-Fi to automatically turn back on.
 
 Sounds simple and obvious, but I couldn't find a tool to do this. I did find [this gist](https://gist.github.com/albertbori/1798d88a93175b9da00b#gistcomment-5913999) by Albert Bori. In 2024 I took Albert's basic idea and wrote `wifi-toggle.sh` from scratch to be as simple to use as possible.
 
-For the last couple years there's been a steady stream of comments on the gist and a couple of forks to add features. This repo is an attempt to provide a central place to document and improve the script.
+For the last couple of years there has been a steady stream of comments on the gist and a couple of forks adding features. This repo is an attempt to provide a central place to document and improve the script.
+
+## How it works
+
+The script automatically discovers network hardware using macOS's built-in `networksetup` command. There is nothing to configure:
+
+- Interfaces that support `networksetup -getairportpower` are treated as Wi-Fi.
+- Other `en` interfaces are treated as wired interfaces.
+- If any wired interface is active, Wi-Fi is turned off.
+- When every wired interface becomes inactive, Wi-Fi is turned back on if this script previously turned it off.
+
+This supports multiple Ethernet adapters, docks, and Thunderbolt interfaces. "Active" means the interface has an active link; it does not guarantee that the wired network has Internet access.
+
+The script remembers when it turns Wi-Fi off. If you manually turn Wi-Fi off, it will respect that choice rather than turning Wi-Fi back on later.
 
 ## Installation
 
-Follow the below instructions with your normal user account (‼️ it will not work if you run it as `root` ‼️).
+Follow these instructions with your normal user account. The script will show an error if you run it as `root`.
 
-1. Download `wifi-toggle.sh` and move it to somewhere in your path (eg. `/usr/local/bin`)
-   
-1. Give the script execute permissions: `chmod 755 wifi-toggle.sh`
+1. Download `wifi-toggle.sh` and move it to a stable location outside Desktop, Documents, or Downloads. For example:
 
-1. List your network devices by running: `networksetup -listnetworkserviceorder`
-
-    ```
-    > networksetup -listnetworkserviceorder
-    An asterisk (*) denotes that a network service is disabled.
-    (1) Thunderbolt Ethernet Slot 0
-    (Hardware Port: Thunderbolt Ethernet Slot 0, Device: en3)
-    
-    (2) Wi-Fi
-    (Hardware Port: Wi-Fi, Device: en0)
+    ```bash
+    mkdir -p ~/bin
+    mv ~/Downloads/wifi-toggle.sh ~/bin/
+    chmod 755 ~/bin/wifi-toggle.sh
     ```
 
-1. You are looking for the device name of your ethernet device. In the above example that's "Thunderbolt Ethernet Slot 0".
+1. If `~/bin` is not in your `$PATH`, either add it to your path, add `wifi-toggle.sh` to another folder which is in your path, or use the full script path in the commands below.
 
-1. Edit `wifi-toggle.sh` and change the ETHERNET_REGEX variable to match the name of your ethernet device. It doesn't have to be the full name of the device, but it **MUST** uniquely match only a single ethernet device. In this case either "Thunderbolt" or "Ethernet" would work fine. If it matches more than one device, the script will error.
+1. Check the automatically detected interfaces:
 
-1. By default the script uses the builtin Mac WiFi device `Wi-Fi`. If you are using another device (eg. a USB WiFi adapter) you will also need to update the `WIFI_REGEX` variable.
+    ```bash
+    wifi-toggle.sh status
+    ```
 
-1. Run `wifi-toggle.sh on` and it will install a launchd service in `~/Library/LaunchAgents`.  From now on ...
+1. Test the toggle manually:
 
-    - If your ethernet is active, your WiFi will automatically turn off
-    - If your ethernet is inactive, your WiFI will automatically turn on.
+    ```bash
+    wifi-toggle.sh run
+    ```
 
-1. If you want to stop the automatic toggle, remove the launchd service by running `wifi-toggle.sh off`.  You can enable it again anytime you like by running `wifi-toggle.sh on` again.
+1. Enable automatic toggling:
 
-⚠️ ⚠️ ⚠️ If the script isn't working as expected, carefully read what it prints to the screen. It will usually show the error. 
+    ```bash
+    wifi-toggle.sh on
+    ```
+
+    This installs and loads a service in `~/Library/LaunchAgents`. From now on:
+
+    - If any wired interface is active, Wi-Fi will automatically turn off.
+    - When every wired interface is inactive, Wi-Fi will turn back on if the script disabled it.
+
+1. To stop automatic toggling:
+
+    ```bash
+    wifi-toggle.sh off
+    ```
+
+    This unloads and removes the launchd service. If the script previously disabled Wi-Fi, it also restores Wi-Fi.
+
+Running `wifi-toggle.sh on` again safely updates the launchd service. Do this after moving the script to a different location.
 
 ## Usage
 
-```
+```text
 ❯ wifi-toggle.sh help
-Automatically toggle macOS Wi-Fi based on ethernet status (uses launchd)
+Automatically toggle macOS Wi-Fi based on wired network status (uses launchd)
 
-Usage: wifi-toggle.sh [ on | off | help ]
-   on - start automatically toggling Wi-Fi (install launchd service)
-  off - stop automatically toggling Wi-Fi (uninstall launchd service)
-  run - Toggle Wi-Fi status
+Usage: wifi-toggle.sh [ on | off | run | status | help ]
+      on - start automatically toggling Wi-Fi (install launchd service)
+     off - stop automatically toggling Wi-Fi (uninstall launchd service)
+     run - toggle Wi-Fi now (also run automatically by launchd)
+  status - show detected interfaces and launchd status
+    help - show this help
 ```
 
-Run the toggle manually.  This is a good way to test that everything is working as expected before you enable the launchd service to autmatically toggle.
+The `status` command shows whether automatic toggling is enabled, every detected interface, and its current state:
 
-If the script thinks everything is correct, you'll see something like the below:
-
+```text
+❯ wifi-toggle.sh status
+Automatic toggle: enabled
+Installed script: /Users/adam/bin/wifi-toggle.sh
+Wi-Fi interfaces:
+  en0: on
+Wired interfaces:
+  en4: active
+  en5: inactive
+Wi-Fi restore pending: yes
 ```
+
+The `run` command is a good way to test behavior before enabling the launchd service. Debug output explains which interfaces were detected and whether Wi-Fi needs to change:
+
+```text
 ❯ wifi-toggle.sh run
-DEBUG: get_interface(): regex 'Ethernet' -> interface 'en3'
-DEBUG: get_interface(): regex '(Wi-Fi|Airport)' -> interface 'en0'
-DEBUG: ethernet status: 'inactive', wifi status: 'active'
-DEBUG: not toggling wifi status
-```
-
-If the script thinks your WiFi needs to be turned on (or off), you'll see something like this:
-
-```
-❯ wifi-toggle.sh run
-DEBUG: get_interface(): regex 'Ethernet' -> interface 'en3'
-DEBUG: get_interface(): regex '(Wi-Fi|Airport)' -> interface 'en0'
-DEBUG: ethernet status: 'inactive', wifi status: 'inactive'
-DEBUG: enabling wifi
+DEBUG: Wi-Fi interfaces: en0
+DEBUG: wired interfaces: en4 en5
+DEBUG: wired interface en4 is inactive
+DEBUG: wired interface en5 is inactive
+DEBUG: all wired interfaces are inactive; Wi-Fi was not disabled by this script
 ```
 
 ## Troubleshooting
 
-- The script requires write permssion to `~/Library/LaunchAgents`.  If you get the below error message, you need to change the permissions so your user account can write a file into `~/Library/LaunchAgents`.
+- First run `wifi-toggle.sh status`, followed by `wifi-toggle.sh run`. Errors from automatic interface discovery or Wi-Fi control will be shown directly.
 
-    ```
-    /wifi-toggle.sh: line 53: ~/Library/LaunchAgents/nz.haume.wifi-toggle.plist: Permission denied
-    ```
-  
-- If you are somewhere without WiFi or ethernet and want to WiFi to stay disabled, you'll need to disable the script with `wifi-toggle.sh off`.
+- Inspect the loaded launchd service with:
 
-- If you have more than one ethernet device, make sure that `ETHERNET_REGEX` only matches the device you want to monitor. Currently the script doesn't support monitoring more than one ethernet device.
+    ```bash
+    launchctl print gui/$(id -u)/nz.haume.wifi-toggle
+    ```
+
+- Validate the installed launchd file with:
+
+    ```bash
+    plutil -lint ~/Library/LaunchAgents/nz.haume.wifi-toggle.plist
+    ```
+
+- The script requires permission to write to `~/Library/LaunchAgents`. It creates that directory automatically when necessary.
+
+- macOS may quarantine a script downloaded through a browser. If you downloaded the file from this repository and receive an `Operation not permitted` error, move it outside Desktop, Documents, and Downloads. If necessary, remove its quarantine attribute:
+
+    ```bash
+    xattr -d com.apple.quarantine ~/bin/wifi-toggle.sh
+    ```
+
+- Do not run the script as `root`. A per-user launchd agent must be installed by the user it belongs to.
+
+- If a wired link is active but has no Internet access, the script still considers it active and turns Wi-Fi off. Disconnect that interface or disable automatic toggling with `wifi-toggle.sh off`.

@@ -1,56 +1,84 @@
 #!/bin/bash
 
-# Automatically toggle macOS Wi-Fi based on ethernet status (uses launchd).
-# If ethernet is active, Wi-Fi is disabled. If ethernet is inactive, Wi-Fi is enabled.
+# Written by Adam Shand <adam@shand.net>
+# https://github.com/adamshand/macos-wifi-toggle
+
+# Automatically toggle macOS Wi-Fi based on wired network status (uses launchd).
+# If any wired interface is active, Wi-Fi is disabled. When all wired interfaces
+# become inactive, Wi-Fi is restored (if this script previously disabled it).
 
 PATH="/bin:/sbin:/usr/bin:/usr/sbin"
 LAUNCHD_SERVICE_NAME="nz.haume.wifi-toggle"
 LAUNCHD_SERVICE_FILE="${HOME}/Library/LaunchAgents/${LAUNCHD_SERVICE_NAME}.plist"
+STATE_DIRECTORY="${HOME}/Library/Application Support/${LAUNCHD_SERVICE_NAME}"
+WIFI_DISABLED_FILE="${STATE_DIRECTORY}/wifi-disabled"
 DEBUG="yes"
 
-# Each regex must match a single interface from `networksetup -listnetworkserviceorder`
-# eg. "(2) CalDigit TS3" or "(1) Apple USB Ethernet Adapter"
-ETHERNET_REGEX="CalDigit TS3"
-# ETHERNET_REGEX="Apple USB Ethernet Adapter"
-# ETHERNET_REGEX="Ethernet"
-WIFI_REGEX="(Wi-Fi|Airport)"
+# Keep the launchd file and state file private to the current user.
+umask 077
 
 print_usage() {
-  echo -e "Automatically toggle macOS Wi-Fi based on ethernet status (uses launchd)\n"
-  echo "Usage: $(basename $0) [ on | off | help ]"
-  echo "   on - start automatically toggling Wi-Fi (install launchd service)"
-  echo "  off - stop automatically toggling Wi-Fi (uninstall launchd service)"
-  echo "  run - Toggle Wi-Fi status (run by launchd)"
-  exit 1
+  echo "Automatically toggle macOS Wi-Fi based on wired network status (uses launchd)"
+  echo
+  echo "Usage: $(basename "$0") [ on | off | run | status | help ]"
+  echo "      on - start automatically toggling Wi-Fi (install launchd service)"
+  echo "     off - stop automatically toggling Wi-Fi (uninstall launchd service)"
+  echo "     run - toggle Wi-Fi now (also run automatically by launchd)"
+  echo "  status - show detected interfaces and launchd status"
+  echo "    help - show this help"
 }
 
 print_error() {
-  echo -e "ERROR: $1" >&2
+  echo "ERROR: $1" >&2
   exit 1
 }
 
 print_debug() {
-  test -n "$DEBUG" && echo -e "DEBUG: $1" >&2
+  if [ -n "$DEBUG" ]; then
+    echo "DEBUG: $1" >&2
+  fi
 }
 
 notify() {
   # Configure notifications in: System Settings > Notifications > Script Editor
-  osascript -e "display notification \"by $(basename $0)\" with title \"$1\""
+  if ! osascript - "$1" "$(basename "$0")" <<'APPLESCRIPT'; then
+on run arguments
+  display notification ("by " & item 2 of arguments) with title (item 1 of arguments)
+end run
+APPLESCRIPT
+    print_debug "unable to display notification"
+  fi
 }
 
 is_launchd_enabled() {
-  if launchctl print gui/$(id -u)/nz.haume.wifi-toggle > /dev/null 2>&1; then
-    print_debug "is_launchd_loaded(): $LAUNCHD_SERVICE_NAME already loaded"
+  if launchctl print "gui/$(id -u)/${LAUNCHD_SERVICE_NAME}" >/dev/null 2>&1; then
+    print_debug "is_launchd_enabled(): $LAUNCHD_SERVICE_NAME is enabled"
     return 0
   else
-    print_debug "is_launchd_loaded(): $LAUNCHD_SERVICE_NAME not loaded"
+    print_debug "is_launchd_enabled(): $LAUNCHD_SERVICE_NAME is disabled"
     return 1
   fi
 }
 
-enable_launchd() {
+xml_escape() {
+  printf "%s" "$1" | sed \
+    -e 's/&/\&amp;/g' \
+    -e 's/</\&lt;/g' \
+    -e 's/>/\&gt;/g'
+}
+
+get_script_file() {
+  SCRIPT_DIRECTORY=$(cd "$(dirname "$0")" && pwd -P) || print_error "Unable to find the script directory"
+  SCRIPT_FILE="${SCRIPT_DIRECTORY}/$(basename "$0")"
+}
+
+create_launchd_service() {
+  get_script_file
+  ESCAPED_SCRIPT_FILE=$(xml_escape "$SCRIPT_FILE")
+  TEMP_SERVICE_FILE=$(mktemp "${LAUNCHD_SERVICE_FILE}.XXXXXX") || print_error "Unable to create launchd service file"
+
   echo "Creating launchd service: $LAUNCHD_SERVICE_FILE"
-  cat <<EOF > "$LAUNCHD_SERVICE_FILE"
+  if ! cat <<EOF >"$TEMP_SERVICE_FILE"; then
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -61,8 +89,8 @@ enable_launchd() {
   <true/>
   <key>ProgramArguments</key>
   <array>
-  <string>$(realpath "$0")</string>
-  <string>run</string>
+    <string>${ESCAPED_SCRIPT_FILE}</string>
+    <string>run</string>
   </array>
   <key>WatchPaths</key>
   <array>
@@ -71,94 +99,250 @@ enable_launchd() {
 </dict>
 </plist>
 EOF
+    rm -f "$TEMP_SERVICE_FILE"
+    print_error "Unable to write launchd service file"
+  fi
+
+  if ! PLIST_ERROR=$(plutil -lint "$TEMP_SERVICE_FILE" 2>&1); then
+    rm -f "$TEMP_SERVICE_FILE"
+    print_error "Invalid launchd service file: $PLIST_ERROR"
+  fi
+
+  mv "$TEMP_SERVICE_FILE" "$LAUNCHD_SERVICE_FILE" || print_error "Unable to install launchd service file"
+}
+
+enable_launchd() {
+  LAUNCHD_WAS_ENABLED="no"
+  if is_launchd_enabled; then
+    LAUNCHD_WAS_ENABLED="yes"
+    echo "Updating launchd service: $LAUNCHD_SERVICE_NAME"
+  fi
+
+  create_launchd_service
+
+  if [ "$LAUNCHD_WAS_ENABLED" == "yes" ]; then
+    launchctl bootout "gui/$(id -u)/${LAUNCHD_SERVICE_NAME}" || print_error "Unable to unload launchd service"
+  fi
+
   echo "Enabling launchd service: $LAUNCHD_SERVICE_NAME"
-  launchctl bootstrap gui/$(id -u) "$LAUNCHD_SERVICE_FILE"
+  launchctl bootstrap "gui/$(id -u)" "$LAUNCHD_SERVICE_FILE" || print_error "Unable to enable launchd service"
 }
 
 disable_launchd() {
-  echo "Disabling launchd service: $LAUNCHD_SERVICE_NAME"
-  launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/nz.haume.wifi-toggle.plist
-  rm "$LAUNCHD_SERVICE_FILE"
-}
-
-get_interface() {
-  test -z "$1" && print_error "get_interface(): no regex provided"
-  INTERFACE=$(networksetup -listnetworkserviceorder | grep -E -A 1 "^\([0-9]+\).* $1" | grep -E -o "en[0-9]+")
-
-  if [ -z "$INTERFACE" ]; then
-    print_error "No ethernet interface matches: $1"
-  elif [[ "$INTERFACE" == *$'\n'* ]]; then
-    print_error "Multiple ethernet interfaces match: $1"
+  if is_launchd_enabled; then
+    echo "Disabling launchd service: $LAUNCHD_SERVICE_NAME"
+    launchctl bootout "gui/$(id -u)/${LAUNCHD_SERVICE_NAME}" || print_error "Unable to disable launchd service"
+  else
+    echo "launchd service already disabled: $LAUNCHD_SERVICE_NAME"
   fi
 
-  print_debug "get_interface(): regex '$1' -> interface '$INTERFACE'"
-  echo "$INTERFACE"
+  if [ -e "$LAUNCHD_SERVICE_FILE" ]; then
+    rm "$LAUNCHD_SERVICE_FILE" || print_error "Unable to remove launchd service file"
+  fi
+}
+
+discover_interfaces() {
+  HARDWARE_PORTS=$(networksetup -listallhardwareports 2>&1) || print_error "Unable to list network hardware: $HARDWARE_PORTS"
+  ALL_INTERFACES=$(printf "%s\n" "$HARDWARE_PORTS" | awk -F ': ' '/^Device: en[0-9]+$/ { print $2 }')
+  WIFI_INTERFACES=""
+  WIRED_INTERFACES=""
+
+  for INTERFACE in $ALL_INTERFACES; do
+    if networksetup -getairportpower "$INTERFACE" >/dev/null 2>&1; then
+      WIFI_INTERFACES="$WIFI_INTERFACES $INTERFACE"
+    else
+      WIRED_INTERFACES="$WIRED_INTERFACES $INTERFACE"
+    fi
+  done
+
+  test -z "$WIFI_INTERFACES" && print_error "No Wi-Fi interface found"
+
+  print_debug "Wi-Fi interfaces:${WIFI_INTERFACES}"
+  if [ -n "$WIRED_INTERFACES" ]; then
+    print_debug "wired interfaces:${WIRED_INTERFACES}"
+  else
+    print_debug "wired interfaces: none detected"
+  fi
 }
 
 is_interface_active() {
   test -z "$1" && print_error "is_interface_active(): no interface provided"
 
-  if ifconfig "$1" 2>&1 | grep -q "status: active"; then
-    echo -n "active"
+  if ifconfig "$1" 2>/dev/null | grep -q "status: active"; then
     return 0
   else
-    echo -n "inactive"
     return 1
   fi
 }
 
-toggle_wifi() {
-  ETHERNET_INTERFACE=$(get_interface "$ETHERNET_REGEX")
-  WIFI_INTERFACE=$(get_interface "$WIFI_REGEX")
+get_wifi_power() {
+  test -z "$1" && print_error "get_wifi_power(): no interface provided"
 
-  ETHERNET_STATUS=$(is_interface_active "$ETHERNET_INTERFACE")
-  WIFI_STATUS=$(is_interface_active "$WIFI_INTERFACE")
-  print_debug "ethernet status: '$ETHERNET_STATUS', wifi status: '$WIFI_STATUS'"
+  WIFI_POWER_OUTPUT=$(networksetup -getairportpower "$1" 2>&1) || print_error "Unable to get Wi-Fi power for $1: $WIFI_POWER_OUTPUT"
 
-  if [ "$ETHERNET_STATUS" == "active" ] && [ "$WIFI_STATUS" == "active" ]; then
-    print_debug "disabling wifi"
-    networksetup -setairportpower "$WIFI_INTERFACE" off
-    notify "Wi-Fi Disabled"
-  elif [ "$ETHERNET_STATUS" == "inactive" ] && [ "$WIFI_STATUS" == "inactive" ]; then
-    print_debug "enabling wifi"
-    networksetup -setairportpower "$WIFI_INTERFACE" on
-    notify "Wi-Fi Enabled"
+  if printf "%s\n" "$WIFI_POWER_OUTPUT" | grep -q ": On$"; then
+    WIFI_POWER="on"
+  elif printf "%s\n" "$WIFI_POWER_OUTPUT" | grep -q ": Off$"; then
+    WIFI_POWER="off"
   else
-    print_debug "not toggling wifi status"
+    print_error "Unknown Wi-Fi power for $1: $WIFI_POWER_OUTPUT"
+  fi
+}
+
+remember_wifi_disabled() {
+  mkdir -p "$STATE_DIRECTORY" || print_error "Unable to create state directory: $STATE_DIRECTORY"
+  touch "$WIFI_DISABLED_FILE" || print_error "Unable to save Wi-Fi state"
+}
+
+restore_wifi() {
+  test ! -e "$WIFI_DISABLED_FILE" && return 0
+
+  WIFI_CHANGED="no"
+  for WIFI_INTERFACE in $WIFI_INTERFACES; do
+    get_wifi_power "$WIFI_INTERFACE"
+    if [ "$WIFI_POWER" == "off" ]; then
+      print_debug "enabling Wi-Fi on $WIFI_INTERFACE"
+      networksetup -setairportpower "$WIFI_INTERFACE" on || print_error "Unable to enable Wi-Fi on $WIFI_INTERFACE"
+      WIFI_CHANGED="yes"
+    fi
+  done
+
+  rm "$WIFI_DISABLED_FILE" || print_error "Unable to clear saved Wi-Fi state"
+  rmdir "$STATE_DIRECTORY" >/dev/null 2>&1 || true
+
+  if [ "$WIFI_CHANGED" == "yes" ]; then
+    notify "Wi-Fi Enabled"
+  fi
+}
+
+toggle_wifi() {
+  discover_interfaces
+
+  WIRED_ACTIVE="no"
+  for WIRED_INTERFACE in $WIRED_INTERFACES; do
+    if is_interface_active "$WIRED_INTERFACE"; then
+      print_debug "wired interface $WIRED_INTERFACE is active"
+      WIRED_ACTIVE="yes"
+    else
+      print_debug "wired interface $WIRED_INTERFACE is inactive"
+    fi
+  done
+
+  if [ "$WIRED_ACTIVE" == "yes" ]; then
+    WIFI_CHANGED="no"
+    for WIFI_INTERFACE in $WIFI_INTERFACES; do
+      get_wifi_power "$WIFI_INTERFACE"
+      print_debug "Wi-Fi interface $WIFI_INTERFACE is $WIFI_POWER"
+
+      if [ "$WIFI_POWER" == "on" ]; then
+        remember_wifi_disabled
+        print_debug "disabling Wi-Fi on $WIFI_INTERFACE"
+        networksetup -setairportpower "$WIFI_INTERFACE" off || print_error "Unable to disable Wi-Fi on $WIFI_INTERFACE"
+        WIFI_CHANGED="yes"
+      fi
+    done
+
+    if [ "$WIFI_CHANGED" == "yes" ]; then
+      notify "Wi-Fi Disabled"
+    fi
+  elif [ -e "$WIFI_DISABLED_FILE" ]; then
+    print_debug "all wired interfaces are inactive; restoring Wi-Fi"
+    restore_wifi
+  else
+    print_debug "all wired interfaces are inactive; Wi-Fi was not disabled by this script"
+  fi
+}
+
+print_status() {
+  discover_interfaces
+
+  if is_launchd_enabled; then
+    echo "Automatic toggle: enabled"
+  else
+    echo "Automatic toggle: disabled"
+  fi
+
+  if [ -e "$LAUNCHD_SERVICE_FILE" ]; then
+    INSTALLED_SCRIPT=$(plutil -extract ProgramArguments.0 raw "$LAUNCHD_SERVICE_FILE" 2>/dev/null) || INSTALLED_SCRIPT="unknown"
+    echo "Installed script: $INSTALLED_SCRIPT"
+
+    get_script_file
+    if [ "$INSTALLED_SCRIPT" != "unknown" ] && [ "$INSTALLED_SCRIPT" != "$SCRIPT_FILE" ]; then
+      echo "Warning: this is not the script used by the installed launchd service"
+    fi
+  fi
+
+  echo "Wi-Fi interfaces:"
+  for WIFI_INTERFACE in $WIFI_INTERFACES; do
+    get_wifi_power "$WIFI_INTERFACE"
+    echo "  $WIFI_INTERFACE: $WIFI_POWER"
+  done
+
+  echo "Wired interfaces:"
+  if [ -n "$WIRED_INTERFACES" ]; then
+    for WIRED_INTERFACE in $WIRED_INTERFACES; do
+      if is_interface_active "$WIRED_INTERFACE"; then
+        echo "  $WIRED_INTERFACE: active"
+      else
+        echo "  $WIRED_INTERFACE: inactive"
+      fi
+    done
+  else
+    echo "  none detected"
+  fi
+
+  if [ -e "$WIFI_DISABLED_FILE" ]; then
+    echo "Wi-Fi restore pending: yes"
+  else
+    echo "Wi-Fi restore pending: no"
   fi
 }
 
 ### main script
-if [ "${OSTYPE:0:6}" != "darwin" ]; then
-  print_error "This script only runs on macOS"
+COMMAND="${1:-}"
+
+if [ "$COMMAND" == "help" ] || [ "$COMMAND" == "-h" ] || [ "$COMMAND" == "--help" ]; then
+  print_usage
+  exit 0
+elif [ -z "$COMMAND" ]; then
+  print_usage
+  exit 1
 fi
 
-if [ "$1" == "run" ]; then
+if [ "${OSTYPE:0:6}" != "darwin" ]; then
+  print_error "This script only runs on macOS"
+elif [ "$(id -u)" == "0" ]; then
+  print_error "Run this script with your normal user account, not as root"
+fi
+
+if [ "$COMMAND" == "run" ]; then
   toggle_wifi
 
-elif [ "$1" == "on" ]; then
-  LAUNCHDIR="${HOME}/Library/LaunchAgents"
-  if [ -d "${LAUNCHDIR}" ]; then
-    print_debug "${LAUNCHDIR} exists"
+elif [ "$COMMAND" == "on" ]; then
+  discover_interfaces
+
+  LAUNCHD_DIRECTORY="${HOME}/Library/LaunchAgents"
+  if [ -d "$LAUNCHD_DIRECTORY" ]; then
+    print_debug "$LAUNCHD_DIRECTORY exists"
   else
-    print_debug "${LAUNCHDIR} does not exist"
-    mkdir "${HOME}/Library/LaunchAgents" && echo "Created directory ${HOME}/Library/LaunchAgents"
-  fi
-  
-  if is_launchd_enabled; then
-    print_error "launchd service already enabled"
-  else
-    enable_launchd
+    mkdir -p "$LAUNCHD_DIRECTORY" || print_error "Unable to create $LAUNCHD_DIRECTORY"
+    echo "Created directory: $LAUNCHD_DIRECTORY"
   fi
 
-elif [ "$1" == "off" ]; then
-  if is_launchd_enabled; then
-    disable_launchd
-  else
-    print_error "launchd service already disabled"
+  enable_launchd
+
+elif [ "$COMMAND" == "off" ]; then
+  disable_launchd
+
+  if [ -e "$WIFI_DISABLED_FILE" ]; then
+    discover_interfaces
+    echo "Restoring Wi-Fi disabled by this script"
+    restore_wifi
   fi
+
+elif [ "$COMMAND" == "status" ]; then
+  print_status
 
 else
-  print_usage
-
+  print_error "Unknown command: $COMMAND"
 fi
