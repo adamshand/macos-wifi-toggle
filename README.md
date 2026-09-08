@@ -42,6 +42,8 @@ Follow these instructions with your normal user account. The script will show an
     wifi-toggle.sh status
     ```
 
+1. Check macOS notification settings in "System Settings > Notifications > Script Editor" and adjust as you prefer.
+   
 1. Test the toggle manually:
 
     ```bash
