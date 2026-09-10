@@ -1,7 +1,5 @@
 # <img height="28" alt="toggle switch" src="https://github.com/user-attachments/assets/54f8838f-8b61-4931-a7f3-793973ad1eaa" /> Automatic Wi-Fi Toggle for macOS
 
-⚠️ If you would like this added to Homebrew, click the star. Homebrew's [package acceptance policy](https://docs.brew.sh/Package-Acceptance-Policy#notability) normally requires 75 stars for a third-party submission or 225 stars for an owner self-submission. Fork and watcher thresholds can also qualify.
-
 - When I connect my MacBook to a wired network, I'd like Wi-Fi to automatically turn off.
 - When I disconnect my MacBook from all wired networks, I'd like Wi-Fi to automatically turn back on.
 
@@ -16,13 +14,32 @@ The script automatically discovers network hardware using macOS's built-in `netw
 - Interfaces that support `networksetup -getairportpower` are treated as Wi-Fi.
 - Other `en` interfaces are treated as wired interfaces.
 - If any wired interface is active, Wi-Fi is turned off.
-- When every wired interface becomes inactive, Wi-Fi is turned back on if this script previously turned it off.
+- When all wired interface are inactive, Wi-Fi is turned back on (but only if this script previously turned it off).
 
-This supports multiple Ethernet adapters, docks, and Thunderbolt interfaces. "Active" means the interface has an active link; it does not guarantee that the wired network has Internet access.
+This supports multiple Ethernet adapters, docks, and Thunderbolt interfaces. *"Active" means the interface has an active link; it does not guarantee that the wired network has Internet access.
 
 The script remembers when it turns Wi-Fi off. If you manually turn Wi-Fi off, it will respect that choice rather than turning Wi-Fi back on later.
 
 ## Installation
+
+### Homebrew (macOS)
+
+```bash
+brew install adamshand/tap/wifi-toggle
+wifi-toggle status
+wifi-toggle on
+```
+
+You must run `wifi-toggle on` to enable automatic toggling.  **Do not use `sudo`.**
+
+To uninstall, stop the agent first (this also restores Wi-Fi if needed):
+
+```bash
+wifi-toggle off
+brew uninstall wifi-toggle
+```
+
+### Manual installation
 
 Follow these instructions with your normal user account. The script will show an error if you run it as `root`.
 
@@ -43,7 +60,7 @@ Follow these instructions with your normal user account. The script will show an
     ```
 
 1. Check macOS notification settings in "System Settings > Notifications > Script Editor" and adjust as you prefer.
-   
+
 1. Test the toggle manually:
 
     ```bash
@@ -72,6 +89,18 @@ Follow these instructions with your normal user account. The script will show an
 Running `wifi-toggle.sh on` again safely updates the launchd service. Do this after moving the script to a different location.
 
 ## Upgrading
+
+**Homebrew:**
+
+```bash
+brew update
+brew upgrade wifi-toggle
+```
+
+The launch agent uses the new script the next time it runs. If release notes
+request a launch-agent update, run `wifi-toggle on` again.
+
+**Manual installation:**
 
 - Copy the new version of `wifi-toggle.sh` over the top of the old one (launchd will use the upgraded script the next time it runs).
 - Run `wifi-toggle.sh on` to validate the installed service.
